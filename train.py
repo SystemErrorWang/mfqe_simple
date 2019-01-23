@@ -15,7 +15,7 @@ from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from MC_subnet import MotionCompensateSubnet
 from QE_subnet import QualityEnhanceSubnet
-from QP_network import QualityPredictNetwork
+#from QP_network import QualityPredictNetwork
 from tensorboardX import SummaryWriter
 
 
@@ -74,41 +74,47 @@ def train_joint():
     o_folder = 'dataset/original_videos'
     c_folder = 'dataset/compressed_small_x265'
     
-    transform = transforms.Compose([RandomCrop(512)])
+    #transform = transforms.Compose([RandomCrop(512)])
 
-    writer = SummaryWriter('log_joing')
-    total_iter, total_epochs = 0, 160
-    min_loss_mc, min_loss_qe = 1e10, 1e10
+    writer = SummaryWriter('log_joint')
+    total_iter, total_epochs = 0, 200
+    min_loss = 1e10
     mcnet = MotionCompensateSubnet().cuda()
     qenet = QualityEnhanceSubnet().cuda()
     mc_criterion = nn.MSELoss().cuda()
     qe_criterion = nn.MSELoss().cuda()
-    all_params = list(model1.parameters()) + list(model2.parameters())
+    all_params = list(mcnet.parameters()) + list(qenet.parameters())
+    optimizer = torch.optim.Adam(all_params, 1e-4, weight_decay=5e-4)
+    '''
     optimizer = torch.optim.SGD(all_params, 2e-4, momentum=0.9,
                                    weight_decay=5e-4, nesterov=True)
+    '''
     
-    for epoch in range(mc_epochs):
-        if np.mod(epoch, 4) == 0:
-            dataset = JointDataset(o_folder, c_folder, 0, 6, transform=RandomCrop(512))
-        elif np.mod(epoch, 4) == 1:
-            dataset = JointDataset(o_folder, c_folder, 6, 12, transform=RandomCrop(512))
-        elif np.mod(epoch, 4) == 2:
-            dataset = JointDataset(o_folder, c_folder, 12, 18, transform=RandomCrop(512))
-        elif np.mod(epoch, 4) == 3:
-            dataset = JointDataset(o_folder, c_folder, 18, 24, transform=RandomCrop(512))
+    for epoch in range(total_epochs):
+        if np.mod(epoch, 5) == 0:
+            dataset = JointDataset(o_folder, c_folder, 0, 5, transform=RandomCrop(128))
+        elif np.mod(epoch, 5) == 1:
+            dataset = JointDataset(o_folder, c_folder, 5, 10, transform=RandomCrop(128))
+        elif np.mod(epoch, 5) == 2:
+            dataset = JointDataset(o_folder, c_folder, 10, 15, transform=RandomCrop(128))
+        elif np.mod(epoch, 5) == 3:
+            dataset = JointDataset(o_folder, c_folder, 15, 20, transform=RandomCrop(128))
+        elif np.mod(epoch, 5) == 4:
+            dataset = JointDataset(o_folder, c_folder, 20, 25, transform=RandomCrop(128))
+            
         dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)
-        for idx, batch in enumerate(dataloader):
+        for idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
             total_iter += 1
-            c_before, c_after = batch[0].cuda(), batch[2].cuda()
-            c_now, o_now = batch[1].cuda(), batch[3].cuda()
+            c_before, c_after = batch[0].float().cuda(), batch[2].float().cuda()
+            c_now, o_now = batch[1].float().cuda(), batch[3].float().cuda()
             
             compensate1 = mcnet(c_now, c_before)
             compensate2 = mcnet(c_now, c_after)
-            enhance = qenet(compensate1, compensate2)
+            enhance = qenet(compensate1, c_now, compensate2)
             
             mc_loss = mc_criterion(compensate1, o_now) + mc_criterion(compensate2, o_now)
             qe_loss = qe_criterion(enhance, o_now)
-            if epoch < 80:
+            if epoch < 100:
                 loss = mc_loss + 1e-2*qe_loss
             else:
                 loss = 1e-2*mc_loss + qe_loss
@@ -163,4 +169,4 @@ def train_joint():
             
     
 if __name__ == '__main__':
-    train_qp_network()
+    train_joint()

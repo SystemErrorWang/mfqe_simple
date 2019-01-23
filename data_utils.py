@@ -179,7 +179,7 @@ class JointDataset(Dataset):
             c_before, c_after = self.transform(c_before), self.transform(c_after)
             c_now, o_now = self.transform(c_now), self.transform(o_now)
             
-        return c_before, c_now, c_after, o_now
+        return c_before/255.0, c_now/255.0, c_after/255.0, o_now/255.0
     
     
     
@@ -211,7 +211,7 @@ class RandomFlip(object):
         pass
 
     
-
+'''
 o_folder = 'dataset/original_videos'
 c_folder = 'dataset/compressed_small_x265'
 
@@ -229,4 +229,4 @@ for epoch in range(4):
     for batch in tqdm(dataloader, total=len(dataloader)):
         pass
     dataset, dataloader = None, None
-
+'''
