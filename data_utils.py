@@ -182,6 +182,56 @@ class JointDataset(Dataset):
         return c_before/255.0, c_now/255.0, c_after/255.0, o_now/255.0
     
     
+class SimpleDataset(Dataset):
+
+    def __init__(self, o_folder, c_folder, idx, transform=None):
+        self.o_files = []
+        self.c_files = []
+        self.transform = transform
+        o_path = os.path.join(o_folder, 
+                    'original_{}.mov'.format(idx))
+        c_path = os.path.join(c_folder, 
+                    'compressed_x265_small_{}.mov'.format(idx))
+   
+        o_cap = cv2.VideoCapture(o_path)
+        c_cap = cv2.VideoCapture(c_path)
+        while (o_cap.isOpened() and c_cap.isOpened()):
+            res, o_frame = o_cap.read()
+            res, c_frame = c_cap.read()
+            if type(o_frame) == type(None) or type(c_frame) == type(None):
+                break
+            o_y = cv2.cvtColor(o_frame, cv2.COLOR_BGR2YUV)[:, :, 0]
+            o_y = np.expand_dims(o_y, 0)
+            c_y = cv2.cvtColor(c_frame, cv2.COLOR_BGR2YUV)[:, :, 0]
+            c_y = np.expand_dims(c_y, 0)
+            self.o_files.append(o_y)
+            self.c_files.append(c_y)
+        self.length = len(self.c_files)
+        
+            
+    def __len__(self):
+        return self.length
+        
+            
+    def __getitem__(self, index):
+        o_now = self.o_files[index]
+        c_now = self.c_files[index]
+        if index <= 0:
+            c_before = c_now
+            c_after = self.c_files[index+1]
+        elif index >= self.length-1:
+            c_before = self.c_files[index-1]
+            c_after = c_now
+        else:
+            c_before = self.c_files[index-1]
+            c_after = self.c_files[index+1]
+    
+        if self.transform:
+            c_before, c_after = self.transform(c_before), self.transform(c_after)
+            c_now, o_now = self.transform(c_now), self.transform(o_now)
+            
+        return c_before/255.0, c_now/255.0, c_after/255.0, o_now/255.0    
+    
     
 class RandomCrop(object):
 
@@ -215,16 +265,9 @@ class RandomFlip(object):
 o_folder = 'dataset/original_videos'
 c_folder = 'dataset/compressed_small_x265'
 
-for epoch in range(4):
-    if np.mod(epoch, 4) == 0:
-        dataset = JointDataset(o_folder, c_folder, 0, 6, transform=RandomCrop(512))
-    elif np.mod(epoch, 4) == 1:
-        dataset = JointDataset(o_folder, c_folder, 6, 12, transform=RandomCrop(512))
-    elif np.mod(epoch, 4) == 2:
-        dataset = JointDataset(o_folder, c_folder, 12, 18, transform=RandomCrop(512))
-    elif np.mod(epoch, 4) == 3:
-        dataset = JointDataset(o_folder, c_folder, 18, 24, transform=RandomCrop(512))
-    
+for epoch in range(25):
+    idx = np.mod(epoch, 25)
+    dataset = SimpleDataset(o_folder, c_folder, idx, transform=RandomCrop(512))
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)
     for batch in tqdm(dataloader, total=len(dataloader)):
         pass

@@ -11,24 +11,31 @@ import torch.nn as nn
 import tensorflow as tf
 
 class Transformer(nn.Module):
-    def __init__(self, flow, pqf):
+    def __init__(self, flow, pqf, cuda=True):
         super(Transformer, self).__init__()
         self.batch = pqf.size()[0]
         self.channel = pqf.size()[1]
         self.flow = flow
         self.pqf = pqf
+        self.cuda = cuda
         self.out_size = pqf.size()[2:]
         
     def repeat(self, x, n_repeats):
         rep = torch.ones(size = [n_repeats])
         rep = rep.unsqueeze(1).transpose(1, 0)
-        x = torch.matmul(x.view(-1, 1), rep).view(-1)
+        if self.cuda:
+            x = x.cuda()
+            rep = rep.cuda()
+        x = torch.matmul(x.view(-1, 1).float(), rep).view(-1)
         return x
     
     def repeat2(self, x, n_repeats):
         rep = torch.ones(size = [n_repeats])
         rep = rep.unsqueeze(1)
-        x = torch.matmul(rep, x.view(1, -1)).view(-1)
+        if self.cuda:
+            x = x.cuda()
+            rep = rep.cuda()
+        x = torch.matmul(rep, x.view(1, -1).float()).view(-1)
         return x
     
     def interpolate(self, im, x, y, out_size):
@@ -103,11 +110,12 @@ class Transformer(nn.Module):
         
 
 '''
-imgb = torch.ones(4, 1, 360, 540)
-c5_hr = torch.ones(4, 2, 360, 540)
+imgb = torch.ones(4, 1, 360, 540).cuda()
+c5_hr = torch.ones(4, 2, 360, 540).cuda()
 transformer = Transformer(c5_hr, imgb)
 print(transformer().size())
 '''
+
     
 
                 

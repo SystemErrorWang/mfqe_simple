@@ -77,7 +77,7 @@ def train_joint():
     #transform = transforms.Compose([RandomCrop(512)])
 
     writer = SummaryWriter('log_joint')
-    total_iter, total_epochs = 0, 200
+    total_iter, total_epochs = 0, 1000
     min_loss = 1e10
     mcnet = MotionCompensateSubnet().cuda()
     qenet = QualityEnhanceSubnet().cuda()
@@ -91,17 +91,9 @@ def train_joint():
     '''
     
     for epoch in range(total_epochs):
-        if np.mod(epoch, 5) == 0:
-            dataset = JointDataset(o_folder, c_folder, 0, 5, transform=RandomCrop(128))
-        elif np.mod(epoch, 5) == 1:
-            dataset = JointDataset(o_folder, c_folder, 5, 10, transform=RandomCrop(128))
-        elif np.mod(epoch, 5) == 2:
-            dataset = JointDataset(o_folder, c_folder, 10, 15, transform=RandomCrop(128))
-        elif np.mod(epoch, 5) == 3:
-            dataset = JointDataset(o_folder, c_folder, 15, 20, transform=RandomCrop(128))
-        elif np.mod(epoch, 5) == 4:
-            dataset = JointDataset(o_folder, c_folder, 20, 25, transform=RandomCrop(128))
-            
+
+        idx = np.mod(epoch, 25)
+        dataset = SimpleDataset(o_folder, c_folder, idx, transform=RandomCrop(128))
         dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)
         for idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
             total_iter += 1
@@ -114,7 +106,7 @@ def train_joint():
             
             mc_loss = mc_criterion(compensate1, o_now) + mc_criterion(compensate2, o_now)
             qe_loss = qe_criterion(enhance, o_now)
-            if epoch < 100:
+            if epoch < 500:
                 loss = mc_loss + 1e-2*qe_loss
             else:
                 loss = 1e-2*mc_loss + qe_loss
