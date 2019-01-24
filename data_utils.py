@@ -64,11 +64,12 @@ def find_pqf(psnr, idx):
         return idx_before, idx_after
     else: 
         return idx, idx
+    
 
-class QPDataset(Dataset):
-    def __init__(self, video_folder, psnr_folder, 
+
+class MCDataset(Dataset):
+    def __init__(self, video_folder, 
                  start, end, transform=None):
-        self.psnr_files = []
         self.video_files = []
         self.all_length = []
         self.len_sep = [0]
@@ -77,9 +78,7 @@ class QPDataset(Dataset):
             timer1 = time.time()
             y_video = []
             video_path = os.path.join(video_folder, 
-                        'compressed_x265_small_{}.mov'.format(idx))
-            psnr_path = os.path.join(psnr_folder, 
-                                     'psnr_{}.npy'.format(idx))
+                        'original_{}.mov'.format(idx))
             cap = cv2.VideoCapture(video_path)
             while (cap.isOpened()):
                 res, frame = cap.read()
@@ -92,11 +91,9 @@ class QPDataset(Dataset):
             
             length = len(y_video)
             self.video_files.append(y_video)
-            self.psnr_files.append(np.load(psnr_path))
             self.all_length.append(length)
             self.len_sep.append(np.sum(self.all_length))
             print('load a video, time:{}'.format(time.time()-timer1))
-            #print(np.shape(y_video))
     
         
     def __len__(self):
@@ -105,17 +102,61 @@ class QPDataset(Dataset):
             
     def __getitem__(self, index):
         video_idx, frame_idx = find_idx(index, self.len_sep)
-        psnr = self.psnr_files[video_idx][frame_idx]
-        frame = self.video_files[video_idx][frame_idx]
-        
+        frame_now = self.video_files[video_idx][frame_idx]
+        if frame_idx <= 0:
+            frame_before = frame_now
+            frame_after = self.video_files[video_idx][frame_idx+1]
+        elif frame_idx >= self.all_length[video_idx]-1:
+            frame_before = self.video_files[video_idx][frame_idx-1]
+            frame_after = frame_now
+        else:
+            frame_before = self.video_files[video_idx][frame_idx-1]
+            frame_after = self.video_files[video_idx][frame_idx+1]
         if self.transform:
-            frame = self.transform(frame)
+            frame_before = self.transform(frame_before)
+            frame_now = self.transform(frame_now)
+            frame_after = self.transform(frame_after)
             
-        return frame, psnr
+        return frame_before/255.0, frame_now/255.0, frame_after/255.0
+
+
+
+class SplitDataset(Dataset):
+    def __init__(self, start, end, transform=None):
+        self.name_list = []
+        self.all_length = []
+        self.len_sep = [0]
+        self.transform = transform
+        for idx in range(start, end):
+            folder = 'dataset/split/split{}'.format(idx)
+            sub_list = [os.path.join(folder, name) for 
+                        name in os.listdir(folder)]
+            self.name_list.append(sub_list)
+            self.all_length.append(len(sub_list))
+            self.len_sep.append(np.sum(self.all_length))
+            
         
-
-
-    
+    def __len__(self):
+        return np.sum(self.all_length)
+  
+            
+    def __getitem__(self, index):
+        video_idx, frame_idx = find_idx(index, self.len_sep)
+        path_now = self.name_list[video_idx][frame_idx]
+        path_before = self.name_list[video_idx][max(0, frame_idx-3)]
+        path_after = self.name_list[video_idx]\
+                    [min(self.all_length[video_idx]-1, frame_idx+3)]
+        
+        frame_before = np.expand_dims(cv2.imread(path_before, 0), 0)
+        frame_now = np.expand_dims(cv2.imread(path_now, 0), 0)
+        frame_after = np.expand_dims(cv2.imread(path_after, 0), 0)
+        if self.transform:
+            frame_before = self.transform(frame_before)
+            frame_now = self.transform(frame_now)
+            frame_after = self.transform(frame_after)
+            
+        return frame_before/255.0, frame_now/255.0, frame_after/255.0        
+        
 
 class JointDataset(Dataset):
 
@@ -265,11 +306,9 @@ class RandomFlip(object):
 o_folder = 'dataset/original_videos'
 c_folder = 'dataset/compressed_small_x265'
 
-for epoch in range(25):
-    idx = np.mod(epoch, 25)
-    dataset = SimpleDataset(o_folder, c_folder, idx, transform=RandomCrop(512))
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)
-    for batch in tqdm(dataloader, total=len(dataloader)):
-        pass
-    dataset, dataloader = None, None
+dataset = SplitDataset(0, 25, transform=RandomCrop(512))
+dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)
+for batch in tqdm(dataloader, total=len(dataloader)):
+    pass
+dataset, dataloader = None, None
 '''

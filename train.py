@@ -77,20 +77,47 @@ def train_joint():
     #transform = transforms.Compose([RandomCrop(512)])
 
     writer = SummaryWriter('log_joint')
-    total_iter, total_epochs = 0, 1000
-    min_loss = 1e10
+    total_iter, mc_epochs, joint_epochs = 0, 2, 500
+    min_loss_mc, min_loss = 1e10, 1e10
     mcnet = MotionCompensateSubnet().cuda()
     qenet = QualityEnhanceSubnet().cuda()
     mc_criterion = nn.MSELoss().cuda()
+    #mc_criterion = nn.L1Loss().cuda()
     qe_criterion = nn.MSELoss().cuda()
     all_params = list(mcnet.parameters()) + list(qenet.parameters())
-    optimizer = torch.optim.Adam(all_params, 1e-4, weight_decay=5e-4)
-    '''
-    optimizer = torch.optim.SGD(all_params, 2e-4, momentum=0.9,
-                                   weight_decay=5e-4, nesterov=True)
-    '''
+    mc_optimizer = torch.optim.Adam(mcnet.parameters(), 1e-4, weight_decay=5e-4)
+    joint_optimizer = torch.optim.Adam(all_params, 1e-4, weight_decay=5e-4)
+
+    dataset = SplitDataset(0, 25, transform=RandomCrop(128))
+    dataloader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=0)
+    for epoch in range(mc_epochs):
+        for idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
+            total_iter += 1
+            before = batch[0].float().cuda()
+            now = batch[1].float().cuda()
+            after = batch[2].float().cuda()
+            
+            compensate1 = mcnet(now, before)
+            compensate2 = mcnet(now, after)
+            
+            mc_loss = mc_criterion(compensate1, now) + mc_criterion(compensate2, now)
+            mc_optimizer.zero_grad()
+            mc_loss.backward()
+            mc_optimizer.step()
+            writer.add_scalar('mc_loss', mc_loss.item(), total_iter)
+            #writer.add_scalar('qe_loss', qe_loss.item(), total_iter)
+            #writer.add_scalar('total_loss', loss.item(), total_iter)
+            
+        print('{}th epoch, {}th iteration, loss:{}'\
+                      .format(epoch, total_iter, mc_loss.item()))
+        if mc_loss.item() < min_loss_mc:
+            min_loss = mc_loss.item()
+            torch.save(mcnet.state_dict(), 
+                       'motion_compensate_network.pth')
+        
     
-    for epoch in range(total_epochs):
+    dataset, dataloader = None, None
+    for epoch in range(joint_epochs):
 
         idx = np.mod(epoch, 25)
         dataset = SimpleDataset(o_folder, c_folder, idx, transform=RandomCrop(128))
@@ -104,21 +131,19 @@ def train_joint():
             compensate2 = mcnet(c_now, c_after)
             enhance = qenet(compensate1, c_now, compensate2)
             
-            mc_loss = mc_criterion(compensate1, o_now) + mc_criterion(compensate2, o_now)
+            mc_loss = mc_criterion(compensate1, c_now) + mc_criterion(compensate2, c_now)
             qe_loss = qe_criterion(enhance, o_now)
-            if epoch < 500:
-                loss = mc_loss + 1e-2*qe_loss
-            else:
-                loss = 1e-2*mc_loss + qe_loss
-            optimizer.zero_grad()
+      
+            loss = 1e-2*mc_loss + qe_loss
+            joint_optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+            joint_optimizer.step()
             writer.add_scalar('mc_loss', mc_loss.item(), total_iter)
             writer.add_scalar('qe_loss', qe_loss.item(), total_iter)
             writer.add_scalar('total_loss', loss.item(), total_iter)
-            if np.mod(idx+1, 100) == 0:
-                print('{}th epoch, {}th iteration, loss:{}'\
-                      .format(epoch, total_iter, mc_loss.item()))
+            
+        print('{}th epoch, {}th iteration, loss:{}'\
+                      .format(epoch, total_iter, loss.item()))
         if loss.item() < min_loss:
             min_loss = loss.item()
             torch.save(mcnet.state_dict(), 
@@ -127,37 +152,7 @@ def train_joint():
                        'quality_enhance_network.pth')
         dataloader, dataset = None, None
             
-    '''
-    qe_writer = SummaryWriter('qe_log')
-    mcnet.load_state_dict('motion_compensate_network.pth')
-    qe_dataset = QEDataset(o_folder, psnr_folder, transform=transform)
-    qe_dataloader = DataLoader(qe_dataset, batch_size=8, shuffle=True, num_workers=4)
-    for epoch in range(qe_epochs):
-        for idx, batch in enumerate(qe_dataloader):
-            c_before, c_now = batch[0].cuda(), batch[1].cuda()
-            c_after, o_now = batch[2].cuda(), batch[3].cuda()
-            
-            compensate1 = mcnet(c_now, c_before)
-            compensate2 = mcnet(c_now, c_after)
-            enhance = qenet(compensate1, compensate2)
-            
-            mc_loss = mc_criterion(compensate1, c_now) + mc_criterion(compensate2, c_now)
-            qe_loss = qe_criterion(enhance, o_now)
-            total_loss = 1e-3 * mc_loss + qe_loss
-            qe_optimizer.zero_grad()
-            total_loss.backward()
-            qe_optimizer.step()
-            qe_writer.add_scalar('qe_loss', qe_loss.item(), 
-                              epoch*len(qe_dataloader)+idx)
-            if np.mod(idx+1, 100) == 0:
-                print('{}th epoch, {}th iteration, loss:{}'\
-                      .format(epoch, idx, total_loss.item()))
-                
-        if total_loss.item() < min_loss_qe:
-            min_loss_qe = total_loss.item()
-            torch.save(qenet.state_dict(), 
-                       'quality_enhance_network.pth')
-    '''
+
             
     
 if __name__ == '__main__':
