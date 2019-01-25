@@ -329,29 +329,45 @@ class ToYUV(object):
         return y_channel
     
     
+from skimage.measure import compare_ssim
+import matplotlib.pyplot as plt
+folder1 = 'dataset/split/split0'
+folder2 = 'dataset/split/split1'
+name_list1 = os.listdir(folder1)
+name_list2 = os.listdir(folder2)
+name_list1.sort()
+total_len = min(len(name_list1), len(name_list1))
+total_time = 0
+ssim_list, diff_list = [], []
+'''
+for i in tqdm(range(1000)):
+    path1 = os.path.join(folder1, name_list1[i])
+    path2 = os.path.join(folder2, name_list2[i])
+    image1 = cv2.imread(path1, 0)
+    image2 = cv2.imread(path2, 0)
+    start = time.time()
+    ssim = compare_ssim(image1, image2)
+    total_time += time.time() - start
+print(total_time/1000)
+'''
 
-video_folder = 'dataset/compressed_small_x265'
-psnr_folder = 'dataset/npy_small_x265'
-'''
-dataset = QPDataset(video_folder, psnr_folder, 0, 8, transform=RandomCrop(512))
-dataloader = DataLoader(dataset, batch_size=8, shuffle=True, num_workers=0)
-'''
-for epoch in range(3):
-    if np.mod(epoch, 3) == 0:
-        #dataset = None
-        dataset = QPDataset(video_folder, psnr_folder, 
-                            0, 8, transform=RandomCrop(512))
-    elif np.mod(epoch, 3) == 1:
-        #dataset = None
-        dataset = QPDataset(video_folder, psnr_folder, 
-                            8, 16, transform=RandomCrop(512))
-    else:
-        #dataset = None
-        dataset = QPDataset(video_folder, psnr_folder, 
-                            16, 24, transform=RandomCrop(512))
-    dataloader = DataLoader(dataset, batch_size=32, 
-                            shuffle=True, num_workers=0)
-    for batch in tqdm(dataloader):
-        pass
-    dataset, dataloader = None, None
+for i in tqdm(range(500, 1500)):
+    path1 = os.path.join(folder2, name_list1[i])
+    path2 = os.path.join(folder2, name_list1[i-3])
+    image1 = cv2.imread(path1, 0)
+    image2 = cv2.imread(path2, 0)
+    
+    h, w = np.shape(image1)
+    pixel_num = h*w
+    image1 = cv2.resize(image1, (h//2, w//2))
+    image2 = cv2.resize(image2, (h//2, w//2))
+    ssim = compare_ssim(image1, image2)
+    ssim_list.append(ssim)
+    #diff = np.mean(np.abs(image2 - image1))
+    diff = np.linalg.norm(image2-image1, 2)
+    diff_list.append(diff/pixel_num)
+
+plt.plot(ssim_list, 'red')
+plt.plot(diff_list, 'blue')
+plt.show()
 
