@@ -38,7 +38,7 @@ def train_mc_network():
     
     
     for epoch in range(total_epochs):
-        dataset = MCDataset(o_folder, transform=RandomCrop(256))
+        dataset = MCDataset(o_folder, transform=CropThreeFrames(256))
         dataloader = DataLoader(dataset, batch_size=32, 
                                 shuffle=True, num_workers=0)
         scheduler.step()
@@ -71,7 +71,7 @@ def train_joint():
     c_folder = 'C:\\Users\\Administrator\\Downloads\\mit_compress'
 
     writer = SummaryWriter('log_joint')
-    total_iter, mc_epochs, joint_epochs = 0, 10, 20
+    total_iter, mc_epochs, joint_epochs = 0, 5, 10
     min_loss_mc, min_loss = 1e10, 1e10
     mcnet = MotionCompensateSubnet().cuda()
     qenet = QualityEnhanceSubnet().cuda()
@@ -82,8 +82,8 @@ def train_joint():
     mc_optimizer = torch.optim.Adam(mcnet.parameters(), 1e-4, weight_decay=5e-4)
     joint_optimizer = torch.optim.Adam(all_params, 1e-4, weight_decay=5e-4)
 
-    dataset = MCDataset(o_folder, transform=RandomCrop(192))
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=0)
+    dataset = MCDataset(o_folder, transform=CropThreeFrames(224))
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)
     for epoch in range(mc_epochs):
         for idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
             total_iter += 1
@@ -107,14 +107,13 @@ def train_joint():
         if mc_loss.item() < min_loss_mc:
             min_loss = mc_loss.item()
             torch.save(mcnet.state_dict(), 
-                       'motion_compensate_network.pth')
+                       'weight\\mcnet_sep_{}th_epoch.pth'.format(epoch))
         
     
     dataset, dataloader = None, None
     for epoch in range(joint_epochs):
-
-        idx = np.mod(epoch, 25)
-        dataset = JointDataset(o_folder, c_folder, transform=RandomCrop(128))
+       
+        dataset = JointDataset(o_folder, c_folder, transform=CropFourFrames(128))
         dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)
         for idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
             total_iter += 1
@@ -144,9 +143,9 @@ def train_joint():
         if loss.item() < min_loss:
             min_loss = loss.item()
             torch.save(mcnet.state_dict(), 
-                       'weight\\motion_compensate_network.pth')
+                       'weight\\mcnet_joint_{}th_epoch.pth'.format(epoch))
             torch.save(qenet.state_dict(), 
-                       'weight\\quality_enhance_network.pth')
+                       'weight\\qenet_joint_{}th_epoch.pth'.format(epoch))
 
             
     
