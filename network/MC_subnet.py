@@ -9,7 +9,7 @@ Created on Fri Jan 18 11:46:04 2019
 import torch
 import torch.nn as nn
 from torch.nn import init
-from Transformer import Transformer, trans_func
+from module.Transformer import Transformer, trans_func
 
 
 '''
