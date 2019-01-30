@@ -43,26 +43,16 @@ def read_video(video_path):
 def bgr2yuv(image):
     b, g, r = image[:, :, 0], image[:, :, 1], image[:, :, 2]
     y = 0.299*r + 0.587*g + 0.114*b
-    u = -0.169*r - 0.331*g +0.5*b + 128
-    v = 0.5*r - 0.419*g -0.081*b + 128
+    u = -0.147*r - 0.289*g + 0.436*b
+    v = 0.615*r - 0.515*g - 0.1*b
     #return np.stack((y, u, v), 2)
     return y, u, v
-
-
-def rgb2yuv(image):
-    r, g, b = image[:, :, 0], image[:, :, 1], image[:, :, 2]
-    y = 0.299*r + 0.587*g + 0.114*b
-    u = -0.169*r - 0.331*g +0.5*b + 128
-    v = 0.5*r - 0.419*g -0.081*b + 128
-    #return np.stack((y, u, v), 2)
-    return y, u, v
-
 
 def yuv2bgr(image):
     y, u, v = image[:, :, 0], image[:, :, 1], image[:, :, 2]
-    b = y + 2.03211*(u - 128)
-    g = y - 0.39465*(u - 128) - 0.58060*(v - 128)
-    r = y + 1.13983*(v - 128)
+    b = y + 2.03*u
+    g = y - 0.39*u - 0.58*v
+    r = y + 1.14*v
     #return np.stack((b, g, r), 2)
     return b, g, r
 
@@ -92,11 +82,12 @@ def rescale(image0, image1):
     return image1.astype(np.uint8)
 
 
-mc_weight = 'weight\\mcnet_joint_8th_epoch.pth'
-qe_weight = 'weight\\qenet_joint_8th_epoch.pth'
+mc_weight = 'weight\\mcnet_joint_3th_epoch.pth'
+qe_weight = 'weight\\qenet_joint_3th_epoch.pth'
 video_folder = 'C:\\Users\\Administrator\\Downloads\\h264_2'
+vidro_name = '450x800-crf30-1074k.mp4'
 name_list = os.listdir(video_folder)
-video_path = os.path.join(video_folder, name_list[0])
+video_path = os.path.join(video_folder, vidro_name)
 video, fps = read_video(video_path)
 
 
@@ -107,12 +98,13 @@ qenet = QualityEnhanceSubnet().cuda()
 mcnet.load_state_dict(torch.load(mc_weight))
 qenet.load_state_dict(torch.load(qe_weight))
 codec = cv2.VideoWriter_fourcc(*'XVID')
-out_video = cv2.VideoWriter('output.avi', codec, fps, (w, h))
+out_video = cv2.VideoWriter('output.avi', codec, fps*2, (w, h))
 
 for idx in tqdm(range(length)):
     before = video[(max(0, idx-3))]
     now = video[idx]
     after = video[min(length-1, idx+3)]
+    
     
     before_y, _, _ = bgr2yuv(before)
     now_y, u, v = bgr2yuv(now)
@@ -132,6 +124,16 @@ for idx in tqdm(range(length)):
     out = np.stack((yuv2bgr(out)), 2)
     out = rescale(now, out)
     out_video.write(out)
+
+    '''
+    y, u, v = bgr2yuv(now)
+    out = np.stack((y, u, v), 2)
+    b, g, r = yuv2bgr(out)
+    out = np.stack((b, g, r), 2).astype(np.uint8)
+    #out = rescale(now, out)
+    '''
+    out_video.write(out)
+    
     
 out_video.release()
 cv2.destroyAllWindows()

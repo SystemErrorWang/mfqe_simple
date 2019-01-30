@@ -17,6 +17,32 @@ from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 
 
+def bgr2yuv(image):
+    b, g, r = image[:, :, 0], image[:, :, 1], image[:, :, 2]
+    y = 0.299*r + 0.587*g + 0.114*b
+    u = -0.169*r - 0.331*g +0.5*b + 128
+    v = 0.5*r - 0.419*g -0.081*b + 128
+    #return np.stack((y, u, v), 2)
+    return y, u, v
+
+
+def rgb2yuv(image):
+    r, g, b = image[:, :, 0], image[:, :, 1], image[:, :, 2]
+    y = 0.299*r + 0.587*g + 0.114*b
+    u = -0.169*r - 0.331*g +0.5*b + 128
+    v = 0.5*r - 0.419*g -0.081*b + 128
+    #return np.stack((y, u, v), 2)
+    return y, u, v
+
+
+def yuv2bgr(image):
+    y, u, v = image[:, :, 0], image[:, :, 1], image[:, :, 2]
+    b = y + 2.03211*(u - 128)
+    g = y - 0.39465*(u - 128) - 0.58060*(v - 128)
+    r = y + 1.13983*(v - 128)
+    #return np.stack((b, g, r), 2)
+    return b, g, r
+
 
 class MCDataset(Dataset):
     def __init__(self, o_folder, transform=None):
@@ -35,18 +61,18 @@ class MCDataset(Dataset):
         
         o_cap.set(1, 0)
         res, o_before = o_cap.read()
-        o_before = cv2.cvtColor(o_before, cv2.COLOR_BGR2YUV)
-        o_before = np.expand_dims(o_before[:, :, 0], 0)
+        o_before, _, _ = bgr2yuv(o_before)
+        o_before = np.expand_dims(o_before, 0)
         
         o_cap.set(1, 3)
         res, o_now = o_cap.read()
-        o_now = cv2.cvtColor(o_now, cv2.COLOR_BGR2YUV)
-        o_now = np.expand_dims(o_now[:, :, 0], 0)
+        o_now, _, _ = bgr2yuv(o_now)
+        o_now = np.expand_dims(o_now, 0)
         
         o_cap.set(1, 6)
         res, o_after = o_cap.read()
-        o_after = cv2.cvtColor(o_after, cv2.COLOR_BGR2YUV)
-        o_after = np.expand_dims(o_after[:, :, 0], 0)
+        o_after, _, _ = bgr2yuv(o_after)
+        o_after = np.expand_dims(o_after, 0)
         
         if self.transform:
             o_before, o_now, o_after = self.transform(o_before, o_now, o_after)
@@ -78,38 +104,26 @@ class JointDataset(Dataset):
         #o_cap.set(cv2.CV_CAP_PROP_POS_FRAMES, 3)
         o_cap.set(1, 3)
         res, o_now = o_cap.read()
-        try:
-            o_now = cv2.cvtColor(o_now, cv2.COLOR_BGR2YUV)
-        except:
-            print(o_path)
-        o_now = np.expand_dims(o_now[:, :, 0], 0)
+        o_now, _, _ = bgr2yuv(o_now)
+        o_now = np.expand_dims(o_now, 0)
         
         #c_cap.set(cv2.CV_CAP_PROP_POS_FRAMES, 0)
         c_cap.set(1, 0)
         res, c_before = c_cap.read()
-        try:
-            c_before = cv2.cvtColor(c_before, cv2.COLOR_BGR2YUV)
-        except:
-            print(c_path)
-        c_before = np.expand_dims(c_before[:, :, 0], 0)
+        c_before, _, _ = bgr2yuv(c_before)
+        c_before = np.expand_dims(c_before, 0)
         
         #c_cap.set(cv2.CV_CAP_PROP_POS_FRAMES, 3)
         c_cap.set(1, 3)
         res, c_now = c_cap.read()
-        try:
-            c_now = cv2.cvtColor(c_now, cv2.COLOR_BGR2YUV)
-        except:
-            print(c_path)
-        c_now = np.expand_dims(c_now[:, :, 0], 0)
+        c_now, _, _ = bgr2yuv(c_now)
+        c_now = np.expand_dims(c_now, 0)
         
         #c_cap.set(cv2.CV_CAP_PROP_POS_FRAMES, 6)
         c_cap.set(1, 6)
         res, c_after = c_cap.read()
-        try:
-            c_after = cv2.cvtColor(c_after, cv2.COLOR_BGR2YUV)
-        except:
-            print(c_path)
-        c_after = np.expand_dims(c_after[:, :, 0], 0)
+        c_after, _, _ = bgr2yuv(c_after)
+        c_after = np.expand_dims(c_after, 0)
         
         if self.transform:
             o_now, c_before, c_now, c_after = self.transform(o_now, c_before, 

@@ -142,6 +142,7 @@ def trans_func(flow, pqf, cuda=True):
         out_height, out_width = out_size[:2]
         zero = torch.zeros([], dtype=torch.float32)
         max_y, max_x = int(im.size()[1] - 1), int(im.size()[2] - 1)
+       
         x = repeat2(torch.arange(width), 
                         height * batch_size) + x * 64
         y = repeat2(repeat(torch.arange(height), width), 
@@ -188,7 +189,7 @@ def trans_func(flow, pqf, cuda=True):
     def transform(x_s, y_s, input_dim, out_size):
         num_batch, num_channels = input_dim.size()[:2]
         height, width = input_dim.size()[2:]
-        #height_f, width_f = height.to(torch.float32), width.to(torch.float32)
+      
         out_height, out_width = out_size
         x_s_flat = x_s.contiguous().view(-1)
         y_s_flat = y_s.contiguous().view(-1)
@@ -198,16 +199,20 @@ def trans_func(flow, pqf, cuda=True):
         output = input_transform.view(batch, channel, out_height, out_width)
         return output
     
+    #print('flow:', flow.size())
     dx, dy = torch.split(flow, 1, 1)
     output = transform(dx, dy, pqf, out_size)
     return output
 
 
 '''
-imgb = torch.ones(4, 1, 360, 540).cuda()
-c5_hr = torch.ones(4, 2, 360, 540).cuda()
+imgb = torch.ones(4, 1, 450, 800).cuda()
+c5_hr = torch.ones(4, 2, 450, 800).cuda()
+
 transformer = Transformer(c5_hr, imgb)
 print(transformer().size())
+
+print(trans_func(c5_hr, imgb).size())
 '''
 
     

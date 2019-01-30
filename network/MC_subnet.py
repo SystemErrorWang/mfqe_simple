@@ -6,6 +6,9 @@ Created on Fri Jan 18 11:46:04 2019
 @author: secret_wang
 """
 
+
+import sys
+sys.path.append('../') 
 import torch
 import torch.nn as nn
 from torch.nn import init
@@ -83,6 +86,10 @@ class MotionCompensateSubnet(nn.Module):
         out_4x = self.ps_4x(torch.tanh(out_4x))
         #transformer_4x = Transformer(out_4x, image_b)
         #wrap_4x = transformer_4x()
+        _, _, h1, w1 = out_4x.size()
+        dh, dw = (h1-h)//2, (w1-w)//2
+        
+        out_4x = out_4x[:, :,dh: dh+h, dw: dw+w]
         wrap_4x = trans_func(out_4x, image_b)
         
         cat_2x = torch.cat((cat_4x, out_4x, wrap_4x), 1)
@@ -202,15 +209,34 @@ class BNMCNet(nn.Module):
         return wrap_1x
     
     
+
 '''
-image_a = torch.ones(4, 1, 360, 540)
-image_b = torch.ones(4, 1, 360, 540)
-mcnet = MotionCompensateSubnet()
-print(mcnet(image_a, image_b).size())
+class test(nn.Module):
+    def __init__(self):
+        super(test, self).__init__()
+        self.downsample_4x = nn.Sequential(
+                nn.Conv2d(2, 24, kernel_size=5, stride=2, padding=2, bias=False),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(24, 24, kernel_size=5, stride=2, padding=2, bias=False),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(24, 32, kernel_size=3, stride=1, padding=1, bias=False),
+                )
+        self.ps_4x = nn.PixelShuffle(4)
+        
+    def forward(self, x):
+        x = self.downsample_4x(x)
+        x = self.ps_4x(x)
+        return x
+
+image = torch.ones(4, 2, 450, 800)
+model = test()
+print(model(image).size())
 '''
-        
-        
-        
+
         
         
         

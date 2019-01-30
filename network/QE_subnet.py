@@ -50,7 +50,7 @@ class QualityEnhanceSubnet(nn.Module):
         
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                init.kaiming_normal_(m.weight.data, a=0.1, mode='fan_in)
+                init.kaiming_normal_(m.weight.data, a=0.1, mode='fan_in')
                 if m.bias is not None:
                     init.constant_(m.bias.data, 0.0)
             elif isinstance(m, nn.Linear):
