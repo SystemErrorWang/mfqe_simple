@@ -7,6 +7,7 @@ Created on Sun Jan 20 18:36:02 2019
 """
 
 import torch
+import os
 import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
@@ -67,8 +68,8 @@ def train_mc_network():
             
             
 def train_joint():
-    o_folder = 'C:\\Users\\Administrator\\Downloads\\mit_dataset'
-    c_folder = 'C:\\Users\\Administrator\\Downloads\\mit_compress'
+    o_folder = 'C:\\Users\\Administrator\\Downloads\\mit_compress'
+    c_folder = 'C:\\Users\\Administrator\\Downloads\\mit_compress_small'
 
     writer = SummaryWriter('log_joint')
     total_iter, mc_epochs, joint_epochs = 0, 1, 10
@@ -150,4 +151,6 @@ def train_joint():
             
     
 if __name__ == '__main__':
+    if not os.path.exists('weight'):
+        os.mkdir('weight')
     train_joint()

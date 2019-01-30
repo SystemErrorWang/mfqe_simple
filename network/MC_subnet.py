@@ -12,7 +12,6 @@ from torch.nn import init
 from module.Transformer import Transformer, trans_func
 
 
-'''
 
 class MotionCompensateSubnet(nn.Module):
     
@@ -73,10 +72,7 @@ class MotionCompensateSubnet(nn.Module):
                 init.normal_(m.weight.data, 1.0, 0.0256)
                 init.constant_(m.bias.data, 0.0)
 
-'''
-
-
-class MotionCompensateSubnet(nn.Module):
+    '''
     
     def __init__(self):
         super(MotionCompensateSubnet, self).__init__()
@@ -161,7 +157,8 @@ class MotionCompensateSubnet(nn.Module):
             elif isinstance(m, nn.BatchNorm2d):
                 init.normal_(m.weight.data, 1.0, 0.0256)
                 init.constant_(m.bias.data, 0.0)
-        
+                
+    '''
         
     def forward(self, image_a, image_b):
         
