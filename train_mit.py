@@ -71,7 +71,7 @@ def train_joint():
     c_folder = 'C:\\Users\\Administrator\\Downloads\\mit_compress'
 
     writer = SummaryWriter('log_joint')
-    total_iter, mc_epochs, joint_epochs = 0, 5, 10
+    total_iter, mc_epochs, joint_epochs = 0, 1, 10
     min_loss_mc, min_loss = 1e10, 1e10
     mcnet = MotionCompensateSubnet().cuda()
     qenet = QualityEnhanceSubnet().cuda()
