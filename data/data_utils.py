@@ -142,6 +142,7 @@ class JointDataset(Dataset):
                 res, c_frame = c_cap.read()
                 if type(o_frame) == type(None) or type(c_frame) == type(None):
                     break
+                
                 o_y, _, _ = bgr2yuv(o_frame)
                 o_y = np.expand_dims(o_y, 0)
                 c_y, _, _ = bgr2yuv(c_frame)
@@ -210,41 +211,37 @@ class SimpleDataset(Dataset):
         o_cap = cv2.VideoCapture(self.o_path[video_idx])
         c_cap = cv2.VideoCapture(self.c_path[video_idx])
         
-        try:
-            o_cap.set(1, frame_idx)
-            res, o_now = o_cap.read()
-            #print(np.shape(o_now))
-            o_now, _, _ = bgr2yuv(o_now)
-            o_now = np.expand_dims(o_now, 0)
-        except:
-            print(self.o_path[video_idx])
+        o_cap.set(1, frame_idx)
+        res, o_now = o_cap.read()
+        o_now = cv2.cvtColor(o_now, cv2.COLOR_BGR2YUV)
+        o_now = np.expand_dims(o_now[:, :, 0], 0)
         
-        try:
-            c_cap.set(1, max(frame_idx-3, 0))
-            res, c_before = c_cap.read()
-            #print(np.shape(c_before))
-            c_before, _, _ = bgr2yuv(c_before)
-            c_before = np.expand_dims(c_before, 0)
-            
-            c_cap.set(1, frame_idx)
-            res, c_now = c_cap.read()
-            #print(np.shape(c_now))
-            c_now, _, _ = bgr2yuv(c_now)
-            c_now = np.expand_dims(c_now, 0)
-            
-            c_cap.set(1, min(frame_idx+3, video_len))
-            res, c_after = c_cap.read()
-            #print(np.shape(c_after))
-            c_after, _, _ = bgr2yuv(c_after)
-            c_after = np.expand_dims(c_after, 0)
-        except:
-            print(self.c_path[video_idx])
+        c_cap.set(1, max(frame_idx-3, 0))
+        res, c_before = c_cap.read()
+        c_before = cv2.cvtColor(c_before, cv2.COLOR_BGR2YUV)
+        c_before = np.expand_dims(c_before[:, :, 0], 0)
+        
+        c_cap.set(1, frame_idx)
+        res, c_now = c_cap.read()
+        c_now = cv2.cvtColor(c_now, cv2.COLOR_BGR2YUV)
+        c_now = np.expand_dims(c_now[:, :, 0], 0)
+        
+        c_cap.set(1, min(frame_idx+3, video_len))
+        res, c_after = c_cap.read()
+        c_after = cv2.cvtColor(c_after, cv2.COLOR_BGR2YUV)
+        c_after = np.expand_dims(c_after[:, :, 0], 0)
+        
         
         
         if self.transform:
             o_now, c_before, c_now, c_after = self.transform(o_now, c_before, c_now, c_after)
         
-        return c_before/255.0, c_now/255.0, c_after/255.0, o_now/255.0    
+        c_before = c_before.astype(np.float32)/255.0
+        c_now = c_now.astype(np.float32)/255.0
+        c_after = c_after.astype(np.float32)/255.0
+        o_now = o_now.astype(np.float32)/255.0
+        
+        return o_now, c_before, c_now, c_after
     
     
 
@@ -303,10 +300,10 @@ class CropFourFrames(object):
         return img1, img2, img3, img4
     
 
-o_folder = 'C:\\Users\\Administrator\\Downloads\\davis_18'
-c_folder = 'C:\\Users\\Administrator\\Downloads\\davis_43'
+o_folder = 'C:\\Users\\Administrator\\Downloads\\davis\\davis_18'
+c_folder = 'C:\\Users\\Administrator\\Downloads\\davis\\davis_43'
 
-dataset = JointDataset(o_folder, c_folder, transform=CropFourFrames(256))
+dataset = SimpleDataset(o_folder, c_folder, transform=CropFourFrames(256))
 dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=0)
 for batch in tqdm(dataloader, total=len(dataloader)):
     pass

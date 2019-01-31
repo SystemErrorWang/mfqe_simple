@@ -83,10 +83,10 @@ def rescale(image0, image1):
     return image1.astype(np.uint8)
 
 
-mc_weight = 'weight\\mcnet_joint_3th_epoch.pth'
-qe_weight = 'weight\\qenet_joint_3th_epoch.pth'
+mc_weight = 'weight\\mcnet_joint_1th_epoch.pth'
+qe_weight = 'weight\\qenet_joint_1th_epoch.pth'
 video_folder = 'C:\\Users\\Administrator\\Downloads\\h264_2'
-vidro_name = '450x800-crf30-1074k.mp4'
+vidro_name = '450x800-crf30-695k.mp4'
 name_list = os.listdir(video_folder)
 video_path = os.path.join(video_folder, vidro_name)
 video, fps = read_video(video_path)
@@ -99,13 +99,12 @@ qenet = QualityEnhanceSubnet().cuda()
 mcnet.load_state_dict(torch.load(mc_weight))
 qenet.load_state_dict(torch.load(qe_weight))
 codec = cv2.VideoWriter_fourcc(*'XVID')
-out_video = cv2.VideoWriter('output.avi', codec, fps*2, (w, h))
+out_video = cv2.VideoWriter('output.avi', codec, fps, (w, h))
 
 for idx in tqdm(range(length)):
     before = video[(max(0, idx-3))]
     now = video[idx]
     after = video[min(length-1, idx+3)]
-    
     
     before_y, _, _ = bgr2yuv(before)
     now_y, u, v = bgr2yuv(now)
@@ -126,12 +125,18 @@ for idx in tqdm(range(length)):
     out = rescale(now, out)
     out_video.write(out)
 
-    '''
+    
     y, u, v = bgr2yuv(now)
     out = np.stack((y, u, v), 2)
     b, g, r = yuv2bgr(out)
     out = np.stack((b, g, r), 2).astype(np.uint8)
-    #out = rescale(now, out)
+    '''
+    yuv = cv2.cvtColor(now, cv2.COLOR_BGR2YUV)
+    yuv = yuv.astype(np.float32)
+    yuv[:, :, 0] = yuv[:, :, 0]/255
+    yuv[:, :, 0] = yuv[:, :, 0]*255
+    yuv = yuv.astype(np.uint8)
+    out = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
     '''
     out_video.write(out)
     

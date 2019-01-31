@@ -14,7 +14,6 @@ import skvideo
 skvideo.setFFmpegPath("C:/Program Files/ffmpeg/bin")
 import skvideo.io
 from tqdm import tqdm
-from color_convert import bgr2yuv, yuv2bgr
 from torch.utils.data import Dataset, DataLoader
 
 
@@ -36,24 +35,28 @@ class MCDataset(Dataset):
         
         o_cap.set(1, 0)
         res, o_before = o_cap.read()
-        o_before, _, _ = bgr2yuv(o_before)
-        o_before = np.expand_dims(o_before, 0)
+        o_before = cv2.cvtColor(o_before, cv2.COLOR_BGR2YUV)
+        o_before = np.expand_dims(o_before[:, :, 0], 0)
         
         o_cap.set(1, 3)
         res, o_now = o_cap.read()
-        o_now, _, _ = bgr2yuv(o_now)
-        o_now = np.expand_dims(o_now, 0)
+        o_now = cv2.cvtColor(o_now, cv2.COLOR_BGR2YUV)
+        o_now = np.expand_dims(o_now[:, :, 0], 0)
         
         o_cap.set(1, 6)
         res, o_after = o_cap.read()
-        o_after, _, _ = bgr2yuv(o_after)
-        o_after = np.expand_dims(o_after, 0)
+        o_after = cv2.cvtColor(o_after, cv2.COLOR_BGR2YUV)
+        o_after = np.expand_dims(o_after[:, :, 0], 0)
         
         if self.transform:
             o_before, o_now, o_after = self.transform(o_before, o_now, o_after)
             
+        o_before = o_before.astype(np.float32)/255.0
+        o_now = o_now.astype(np.float32)/255.0
+        o_after = o_after.astype(np.float32)/255.0
             
-        return o_before/255.0, o_now/255.0, o_after/255.0
+            
+        return o_before, o_now, o_after
 
 
 
