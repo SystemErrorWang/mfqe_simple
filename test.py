@@ -7,6 +7,7 @@ import skvideo.io
 import numpy as np
 
 from tqdm import tqdm
+from data.color_convert import bgr2yuv, yuv2bgr
 from network.MC_subnet import MotionCompensateSubnet
 from network.QE_subnet import QualityEnhanceSubnet
 
@@ -39,7 +40,7 @@ def read_video(video_path):
             break
     return video, fps
 
-
+'''
 def bgr2yuv(image):
     b, g, r = image[:, :, 0], image[:, :, 1], image[:, :, 2]
     y = 0.299*r + 0.587*g + 0.114*b
@@ -55,7 +56,7 @@ def yuv2bgr(image):
     r = y + 1.14*v
     #return np.stack((b, g, r), 2)
     return b, g, r
-
+'''
 
 def rescale(image0, image1):
     '''

@@ -68,8 +68,8 @@ def train_mc_network():
             
             
 def train_joint():
-    o_folder = 'C:\\Users\\Administrator\\Downloads\\mit_compress'
-    c_folder = 'C:\\Users\\Administrator\\Downloads\\mit_compress_small'
+    o_folder = 'C:\\Users\\Administrator\\Downloads\\vimeo90k\\train_hr'
+    c_folder = 'C:\\Users\\Administrator\\Downloads\\vimeo90k\\train_compress'
 
     writer = SummaryWriter('log_joint')
     total_iter, mc_epochs, joint_epochs = 0, 1, 10

@@ -14,34 +14,9 @@ import skvideo
 skvideo.setFFmpegPath("C:/Program Files/ffmpeg/bin")
 import skvideo.io
 from tqdm import tqdm
+from color_convert import bgr2yuv, yuv2bgr
 from torch.utils.data import Dataset, DataLoader
 
-
-def bgr2yuv(image):
-    b, g, r = image[:, :, 0], image[:, :, 1], image[:, :, 2]
-    y = 0.299*r + 0.587*g + 0.114*b
-    u = -0.169*r - 0.331*g +0.5*b + 128
-    v = 0.5*r - 0.419*g -0.081*b + 128
-    #return np.stack((y, u, v), 2)
-    return y, u, v
-
-
-def rgb2yuv(image):
-    r, g, b = image[:, :, 0], image[:, :, 1], image[:, :, 2]
-    y = 0.299*r + 0.587*g + 0.114*b
-    u = -0.169*r - 0.331*g +0.5*b + 128
-    v = 0.5*r - 0.419*g -0.081*b + 128
-    #return np.stack((y, u, v), 2)
-    return y, u, v
-
-
-def yuv2bgr(image):
-    y, u, v = image[:, :, 0], image[:, :, 1], image[:, :, 2]
-    b = y + 2.03211*(u - 128)
-    g = y - 0.39465*(u - 128) - 0.58060*(v - 128)
-    r = y + 1.13983*(v - 128)
-    #return np.stack((b, g, r), 2)
-    return b, g, r
 
 
 class MCDataset(Dataset):

@@ -14,6 +14,7 @@ import skvideo
 skvideo.setFFmpegPath("C:/Program Files/ffmpeg/bin")
 import skvideo.io
 from tqdm import tqdm
+from color_convert import bgr2yuv, yuv2bgr
 from torch.utils.data import Dataset, DataLoader
 
 
@@ -117,63 +118,22 @@ class MCDataset(Dataset):
             frame_now = self.transform(frame_now)
             frame_after = self.transform(frame_after)
             
-        return frame_before/255.0, frame_now/255.0, frame_after/255.0
-
-
-
-class SplitDataset(Dataset):
-    def __init__(self, start, end, transform=None):
-        self.name_list = []
-        self.all_length = []
-        self.len_sep = [0]
-        self.transform = transform
-        for idx in range(start, end):
-            folder = 'dataset/split/split{}'.format(idx)
-            sub_list = [os.path.join(folder, name) for 
-                        name in os.listdir(folder)]
-            self.name_list.append(sub_list)
-            self.all_length.append(len(sub_list))
-            self.len_sep.append(np.sum(self.all_length))
-            
-        
-    def __len__(self):
-        return np.sum(self.all_length)
-  
-            
-    def __getitem__(self, index):
-        video_idx, frame_idx = find_idx(index, self.len_sep)
-        path_now = self.name_list[video_idx][frame_idx]
-        path_before = self.name_list[video_idx][max(0, frame_idx-3)]
-        path_after = self.name_list[video_idx]\
-                    [min(self.all_length[video_idx]-1, frame_idx+3)]
-        
-        frame_before = np.expand_dims(cv2.imread(path_before, 0), 0)
-        frame_now = np.expand_dims(cv2.imread(path_now, 0), 0)
-        frame_after = np.expand_dims(cv2.imread(path_after, 0), 0)
-        if self.transform:
-            frame_before = self.transform(frame_before)
-            frame_now = self.transform(frame_now)
-            frame_after = self.transform(frame_after)
-            
-        return frame_before/255.0, frame_now/255.0, frame_after/255.0        
+        return frame_before/255.0, frame_now/255.0, frame_after/255.0     
         
 
 class JointDataset(Dataset):
 
-    def __init__(self, o_folder, c_folder, 
-                 start, end, transform=None):
+    def __init__(self, o_folder, c_folder, transform=None):
         self.o_files = []
         self.c_files = []
         self.all_length = []
         self.len_sep = [0]
         self.transform = transform
-        for idx in range(start, end):
-            timer1 = time.time()
+        for name in tqdm(os.listdir(o_folder)):
+            
             o_frames, c_frames = [], []
-            o_path = os.path.join(o_folder, 
-                        'original_{}.mov'.format(idx))
-            c_path = os.path.join(c_folder, 
-                        'compressed_x265_small_{}.mov'.format(idx))
+            o_path = os.path.join(o_folder, name)
+            c_path = os.path.join(c_folder, name)
        
             o_cap = cv2.VideoCapture(o_path)
             c_cap = cv2.VideoCapture(c_path)
@@ -182,20 +142,19 @@ class JointDataset(Dataset):
                 res, c_frame = c_cap.read()
                 if type(o_frame) == type(None) or type(c_frame) == type(None):
                     break
-                o_y = cv2.cvtColor(o_frame, cv2.COLOR_BGR2YUV)[:, :, 0]
+                o_y, _, _ = bgr2yuv(o_frame)
                 o_y = np.expand_dims(o_y, 0)
-                c_y = cv2.cvtColor(c_frame, cv2.COLOR_BGR2YUV)[:, :, 0]
+                c_y, _, _ = bgr2yuv(c_frame)
                 c_y = np.expand_dims(c_y, 0)
                 o_frames.append(o_y)
                 c_frames.append(c_y)
-            
             
             length = len(o_frames)
             self.c_files.append(c_frames)
             self.o_files.append(o_frames)
             self.all_length.append(length)
             self.len_sep.append(np.sum(self.all_length))
-            print('load a video, time:{}'.format(time.time()-timer1))
+            
             
             
     def __len__(self):
@@ -204,77 +163,92 @@ class JointDataset(Dataset):
             
     def __getitem__(self, index):
         video_idx, frame_idx = find_idx(index, self.len_sep)
+        video_len = self.all_length[video_idx]-1
         o_now = self.o_files[video_idx][frame_idx]
         c_now = self.c_files[video_idx][frame_idx]
-        if frame_idx <= 0:
-            c_before = c_now
-            c_after = self.c_files[video_idx][frame_idx+1]
-        elif frame_idx >= self.all_length[video_idx]-1:
-            c_before = self.c_files[video_idx][frame_idx-1]
-            c_after = c_now
-        else:
-            c_before = self.c_files[video_idx][frame_idx-1]
-            c_after = self.c_files[video_idx][frame_idx+1]
+        c_before = self.c_files[video_idx][max(frame_idx-3, 0)]
+        c_after = self.c_files[video_idx][min(frame_idx+3, video_len)]
     
         if self.transform:
-            c_before, c_after = self.transform(c_before), self.transform(c_after)
-            c_now, o_now = self.transform(c_now), self.transform(o_now)
+            o_now, c_before, c_now, c_after = self.transform(o_now, c_before, c_now, c_after)
             
         return c_before/255.0, c_now/255.0, c_after/255.0, o_now/255.0
     
     
 class SimpleDataset(Dataset):
+    '''
+    output should be (bs, 1, h, w)
+    image in y channel rescaled to (0, 1) 
+    '''
 
-    def __init__(self, o_folder, c_folder, idx, transform=None):
-        self.o_files = []
-        self.c_files = []
+    def __init__(self, o_folder, c_folder, transform=None):
+        self.all_length = []
+        self.len_sep = [0]
+        self.o_path = []
+        self.c_path = []
         self.transform = transform
-        o_path = os.path.join(o_folder, 
-                    'original_{}.mov'.format(idx))
-        c_path = os.path.join(c_folder, 
-                    'compressed_x265_small_{}.mov'.format(idx))
-   
-        o_cap = cv2.VideoCapture(o_path)
-        c_cap = cv2.VideoCapture(c_path)
-        while (o_cap.isOpened() and c_cap.isOpened()):
-            res, o_frame = o_cap.read()
-            res, c_frame = c_cap.read()
-            if type(o_frame) == type(None) or type(c_frame) == type(None):
-                break
-            o_y = cv2.cvtColor(o_frame, cv2.COLOR_BGR2YUV)[:, :, 0]
-            o_y = np.expand_dims(o_y, 0)
-            c_y = cv2.cvtColor(c_frame, cv2.COLOR_BGR2YUV)[:, :, 0]
-            c_y = np.expand_dims(c_y, 0)
-            self.o_files.append(o_y)
-            self.c_files.append(c_y)
-        self.length = len(self.c_files)
+        
+        for name in os.listdir(o_folder):
+            o_path = os.path.join(o_folder, name)
+            c_path = os.path.join(c_folder, name)
+            self.o_path.append(o_path)
+            self.c_path.append(c_path)
+            cap = cv2.VideoCapture(o_path)
+            frame = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.all_length.append(frame)
+            self.len_sep.append(np.sum(self.all_length))
         
             
     def __len__(self):
-        return self.length
+        return np.sum(self.all_length)
         
             
     def __getitem__(self, index):
-        o_now = self.o_files[index]
-        c_now = self.c_files[index]
-        if index <= 0:
-            c_before = c_now
-            c_after = self.c_files[index+1]
-        elif index >= self.length-1:
-            c_before = self.c_files[index-1]
-            c_after = c_now
-        else:
-            c_before = self.c_files[index-1]
-            c_after = self.c_files[index+1]
-    
-        if self.transform:
-            c_before, c_after = self.transform(c_before), self.transform(c_after)
-            c_now, o_now = self.transform(c_now), self.transform(o_now)
+        video_idx, frame_idx = find_idx(index, self.len_sep)
+        video_len = self.all_length[video_idx]-1
+        
+        o_cap = cv2.VideoCapture(self.o_path[video_idx])
+        c_cap = cv2.VideoCapture(self.c_path[video_idx])
+        
+        try:
+            o_cap.set(1, frame_idx)
+            res, o_now = o_cap.read()
+            #print(np.shape(o_now))
+            o_now, _, _ = bgr2yuv(o_now)
+            o_now = np.expand_dims(o_now, 0)
+        except:
+            print(self.o_path[video_idx])
+        
+        try:
+            c_cap.set(1, max(frame_idx-3, 0))
+            res, c_before = c_cap.read()
+            #print(np.shape(c_before))
+            c_before, _, _ = bgr2yuv(c_before)
+            c_before = np.expand_dims(c_before, 0)
             
+            c_cap.set(1, frame_idx)
+            res, c_now = c_cap.read()
+            #print(np.shape(c_now))
+            c_now, _, _ = bgr2yuv(c_now)
+            c_now = np.expand_dims(c_now, 0)
+            
+            c_cap.set(1, min(frame_idx+3, video_len))
+            res, c_after = c_cap.read()
+            #print(np.shape(c_after))
+            c_after, _, _ = bgr2yuv(c_after)
+            c_after = np.expand_dims(c_after, 0)
+        except:
+            print(self.c_path[video_idx])
+        
+        
+        if self.transform:
+            o_now, c_before, c_now, c_after = self.transform(o_now, c_before, c_now, c_after)
+        
         return c_before/255.0, c_now/255.0, c_after/255.0, o_now/255.0    
     
     
-class RandomCrop(object):
+
+class CropThreeFrames(object):
 
     def __init__(self, output_size):
         assert isinstance(output_size, (int, tuple))
@@ -284,31 +258,57 @@ class RandomCrop(object):
             assert len(output_size) == 2
             self.output_size = output_size
 
-    def __call__(self, image):
-        h, w = image.shape[1:]
+    def __call__(self, img1, img2, img3):
+        h, w = img1.shape[1:]
         new_h, new_w = self.output_size
+
         top = np.random.randint(0, h - new_h)
         left = np.random.randint(0, w - new_w)
-        image = image[:, top: top + new_h,
-                      left: left + new_w]
-        return image
+        img1 = img1[:, top: top + new_h,
+                  left: left + new_w]
+        img2 = img2[:, top: top + new_h,
+                  left: left + new_w]
+        img3 = img3[:, top: top + new_h,
+                  left: left + new_w]
+       
+        return img1, img2, img3
 
-
-class RandomFlip(object):
-    def __init__(self):
-        pass
-    
-    def __call__(self, image):
-        pass
 
     
-'''
-o_folder = 'dataset/original_videos'
-c_folder = 'dataset/compressed_small_x265'
+class CropFourFrames(object):
 
-dataset = SplitDataset(0, 25, transform=RandomCrop(512))
-dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)
+    def __init__(self, output_size):
+        assert isinstance(output_size, (int, tuple))
+        if isinstance(output_size, int):
+            self.output_size = (output_size, output_size)
+        else:
+            assert len(output_size) == 2
+            self.output_size = output_size
+
+    def __call__(self, img1, img2, img3, img4):
+        h, w = img1.shape[1:]
+        new_h, new_w = self.output_size
+
+        top = np.random.randint(0, h - new_h)
+        left = np.random.randint(0, w - new_w)
+        img1 = img1[:, top: top + new_h,
+                  left: left + new_w]
+        img2 = img2[:, top: top + new_h,
+                  left: left + new_w]
+        img3 = img3[:, top: top + new_h,
+                  left: left + new_w]
+        img4 = img4[:, top: top + new_h,
+                  left: left + new_w]
+        
+        return img1, img2, img3, img4
+    
+
+o_folder = 'C:\\Users\\Administrator\\Downloads\\davis_18'
+c_folder = 'C:\\Users\\Administrator\\Downloads\\davis_43'
+
+dataset = JointDataset(o_folder, c_folder, transform=CropFourFrames(256))
+dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=0)
 for batch in tqdm(dataloader, total=len(dataloader)):
     pass
-dataset, dataloader = None, None
-'''
+
+
