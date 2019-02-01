@@ -11,7 +11,6 @@ import time
 import torch
 import numpy as np
 from tqdm import tqdm
-from color_convert import bgr2yuv, yuv2bgr
 from torch.utils.data import Dataset, DataLoader
 
 
@@ -73,17 +72,15 @@ class MCDataset(Dataset):
         self.o_files = []
         self.transform = transform
         for folder in os.listdir(o_folder):
-            o_frames = []
+            o_paths = []
             o_subfolder = os.path.join(o_folder, folder)
        
-            for name in tqdm(os.listdir(o_subfolder)):
+            for name in os.listdir(o_subfolder):
                 o_path = os.path.join(o_subfolder, name)
-                o_frame = cv2.imread(o_path)
-                o_frame = cv2.cvtColor(o_frame, cv2.COLOR_BGR2YUV)[:, :, 0]
-                o_frames.append(o_frame)
+                o_paths.append(o_path)
                 
-            length = len(o_frames)
-            self.o_files.append(o_frames)
+            length = len(o_paths)
+            self.o_files.append(o_paths)
             self.all_length.append(length)
             self.len_sep.append(np.sum(self.all_length))
             
@@ -101,9 +98,12 @@ class MCDataset(Dataset):
         o_before = self.o_files[video_idx][max(frame_idx-3, 0)]
         o_after = self.o_files[video_idx][min(frame_idx+3, sub_len)]
         
-        o_now = np.expand_dims(o_now, 0)
-        o_before = np.expand_dims(o_before, 0)
-        o_after = np.expand_dims(o_after, 0)
+        o_now = cv2.cvtColor(cv2.imread(o_now), cv2.COLOR_BGR2YUV)
+        o_now = np.expand_dims(o_now[:, :, 0], 0)
+        o_before = cv2.cvtColor(cv2.imread(o_before), cv2.COLOR_BGR2YUV)
+        o_before = np.expand_dims(o_before[:, :, 0], 0)
+        o_after = cv2.cvtColor(cv2.imread(o_after), cv2.COLOR_BGR2YUV)
+        o_after = np.expand_dims(o_after[:, :, 0], 0)
     
         if self.transform:
             o_before, o_now, o_after = self.transform(o_before, o_now, o_after)
@@ -127,23 +127,19 @@ class JointDataset(Dataset):
         self.transform = transform
         for folder in os.listdir(o_folder):
             
-            o_frames, c_frames = [], []
+            o_paths, c_paths = [], []
             o_subfolder = os.path.join(o_folder, folder)
             c_subfolder = os.path.join(c_folder, folder)
        
-            for name in tqdm(os.listdir(o_subfolder)):
+            for name in os.listdir(o_subfolder):
                 o_path = os.path.join(o_subfolder, name)
                 c_path = os.path.join(c_subfolder, name)
-                o_frame = cv2.imread(o_path)
-                c_frame = cv2.imread(c_path)
-                o_frame = cv2.cvtColor(o_frame, cv2.COLOR_BGR2YUV)[:, :, 0]
-                c_frame = cv2.cvtColor(c_frame, cv2.COLOR_BGR2YUV)[:, :, 0]
-                o_frames.append(o_frame)
-                c_frames.append(c_frame)
+                o_paths.append(o_path)
+                c_paths.append(c_path)
                 
-            length = len(o_frames)
-            self.c_files.append(c_frames)
-            self.o_files.append(o_frames)
+            length = len(o_paths)
+            self.c_files.append(c_paths)
+            self.o_files.append(o_paths)
             self.all_length.append(length)
             self.len_sep.append(np.sum(self.all_length))
             
@@ -161,10 +157,14 @@ class JointDataset(Dataset):
         c_before = self.c_files[video_idx][max(frame_idx-3, 0)]
         c_after = self.c_files[video_idx][min(frame_idx+3, sub_len)]
         
-        o_now = np.expand_dims(o_now, 0)
-        c_now = np.expand_dims(c_now, 0)
-        c_before = np.expand_dims(c_before, 0)
-        c_after = np.expand_dims(c_after, 0)
+        o_now = cv2.cvtColor(cv2.imread(o_now), cv2.COLOR_BGR2YUV)
+        o_now = np.expand_dims(o_now[:, :, 0], 0)
+        c_now = cv2.cvtColor(cv2.imread(c_now), cv2.COLOR_BGR2YUV)
+        c_now = np.expand_dims(c_now[:, :, 0], 0)
+        c_before = cv2.cvtColor(cv2.imread(c_before), cv2.COLOR_BGR2YUV)
+        c_before = np.expand_dims(c_before[:, :, 0], 0)
+        c_after = cv2.cvtColor(cv2.imread(c_after), cv2.COLOR_BGR2YUV)
+        c_after = np.expand_dims(c_after[:, :, 0], 0)
     
         if self.transform:
             o_now, c_before, c_now, c_after = self.transform(o_now, c_before, c_now, c_after)
@@ -234,12 +234,21 @@ class CropFourFrames(object):
         return img1, img2, img3, img4
     
 
+'''
 o_folder = 'C:\\Users\\Administrator\\Downloads\\davis\\hr_image'
 c_folder = 'C:\\Users\\Administrator\\Downloads\\davis\\lr_image'
 
-dataset = JointDataset(o_folder, c_folder, transform=CropFourFrames(256))
-dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=0)
+dataset = JointDataset(o_folder, c_folder, transform=CropFourFrames(512))
+dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
+idx = 0
 for batch in tqdm(dataloader, total=len(dataloader)):
-    pass
-
-
+    o, _, c, _ = batch[:]
+    _, _, h, w = o.size()
+    o = o.reshape(h, w, 1)*255.0
+    c = c.reshape(h, w, 1)*255.0
+    o = o.numpy().astype(np.uint8)
+    c = c.numpy().astype(np.uint8)
+    cv2.imwrite('{}hr.jpg'.format(idx), o)
+    cv2.imwrite('{}lr.jpg'.format(idx), c)
+    idx += 1
+'''

@@ -14,7 +14,6 @@ import skvideo
 skvideo.setFFmpegPath("C:/Program Files/ffmpeg/bin")
 import skvideo.io
 from tqdm import tqdm
-from color_convert import bgr2yuv, yuv2bgr
 from torch.utils.data import Dataset, DataLoader
 
 
@@ -304,7 +303,7 @@ o_folder = 'C:\\Users\\Administrator\\Downloads\\davis\\davis_18'
 c_folder = 'C:\\Users\\Administrator\\Downloads\\davis\\davis_43'
 
 dataset = SimpleDataset(o_folder, c_folder, transform=CropFourFrames(256))
-dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=0)
+dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=0)
 for batch in tqdm(dataloader, total=len(dataloader)):
     pass
 
